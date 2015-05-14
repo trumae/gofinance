@@ -3,6 +3,7 @@ package gofinance
 import (
 	"code.google.com/p/go-uuid/uuid"
 	"encoding/json"
+	"github.com/boltdb/bolt"
 	"github.com/shopspring/decimal"
 	"log"
 	"time"
@@ -15,6 +16,32 @@ const (
 	AccountsTypeBrazil = iota
 	AccountTypeUSA
 )
+
+var (
+	dbFilename = "accounts.db"
+	bAccounts  = "accounts"
+	bEntry     = "entries"
+)
+
+func init() {
+	db, err := bolt.Open(dbFilename, 0600, nil)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	defer db.Close()
+
+	db.Update(func(tx *bolt.Tx) error {
+		_, err := tx.CreateBucketIfNotExists([]byte(bAccounts))
+		if err != nil {
+			log.Fatalln("create bucket:", bAccounts, err)
+		}
+		_, err = tx.CreateBucketIfNotExists([]byte(bEntry))
+		if err != nil {
+			log.Fatalln("create bucket:", bEntry, err)
+		}
+		return nil
+	})
+}
 
 type Account struct {
 	Reference string
@@ -212,11 +239,6 @@ func NewAccountsBrazil() *Accounts {
 		Type:      AccountsTypeBrazil}
 }
 
-func GetAccountsByName(name string) Accounts {
-	// TODO
-	return Accounts{}
-}
-
 func (accs *Accounts) GetAccountRefByName(name string) string {
 	// TODO
 	return ""
@@ -270,9 +292,42 @@ func (ent Entry) Valid() bool {
 
 // Persistence
 
+func GetAccountsByUser(name string) (Accounts, error) {
+	db, err := bolt.Open(dbFilename, 0600, nil)
+	if err != nil {
+		return Accounts{}, err
+	}
+	defer db.Close()
+	accs := Accounts{}
+
+	err = db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(bAccounts))
+		raccs := b.Get([]byte(name))
+		err := json.Unmarshal(raccs, &accs)
+		return err
+	})
+
+	return accs, err
+}
+
 func (accs *Accounts) Save() error {
-	// TODO
-	return nil
+	db, err := bolt.Open(dbFilename, 0600, nil)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	err = db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(bAccounts))
+		json, err := accs.Json()
+		if err != nil {
+			log.Println(err)
+		}
+		err = b.Put([]byte(accs.User), json)
+		return err
+	})
+
+	return err
 }
 
 func (accs *Accounts) Remove() error {
