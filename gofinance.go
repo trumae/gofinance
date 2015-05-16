@@ -3,6 +3,7 @@ package gofinance
 import (
 	"code.google.com/p/go-uuid/uuid"
 	"encoding/json"
+	"errors"
 	"github.com/boltdb/bolt"
 	"github.com/shopspring/decimal"
 	"log"
@@ -18,6 +19,9 @@ const (
 )
 
 var (
+	// errors
+	notFound = errors.New("NotFound")
+
 	dbFilename = "accounts.db"
 	bAccounts  = "accounts"
 	bEntry     = "entries"
@@ -177,55 +181,55 @@ func NewAccountsBrazil() *Accounts {
 		Type:      Debit,
 		Info:      "",
 		CreatedAt: time.Now()}
-	receitas.AddAccount(Account{
+	despesas.AddAccount(Account{
 		Reference: NewReference(),
 		Name:      "Fiscais",
 		Type:      Debit,
 		Info:      "",
 		CreatedAt: time.Now()})
-	receitas.AddAccount(Account{
+	despesas.AddAccount(Account{
 		Reference: NewReference(),
 		Name:      "Aluguel",
 		Type:      Debit,
 		Info:      "",
 		CreatedAt: time.Now()})
-	receitas.AddAccount(Account{
+	despesas.AddAccount(Account{
 		Reference: NewReference(),
 		Name:      "Agua",
 		Type:      Debit,
 		Info:      "",
 		CreatedAt: time.Now()})
-	receitas.AddAccount(Account{
+	despesas.AddAccount(Account{
 		Reference: NewReference(),
 		Name:      "Luz",
 		Type:      Debit,
 		Info:      "",
 		CreatedAt: time.Now()})
-	receitas.AddAccount(Account{
+	despesas.AddAccount(Account{
 		Reference: NewReference(),
 		Name:      "Telefone",
 		Type:      Debit,
 		Info:      "",
 		CreatedAt: time.Now()})
-	receitas.AddAccount(Account{
+	despesas.AddAccount(Account{
 		Reference: NewReference(),
 		Name:      "Internet",
 		Type:      Debit,
 		Info:      "",
 		CreatedAt: time.Now()})
-	receitas.AddAccount(Account{
+	despesas.AddAccount(Account{
 		Reference: NewReference(),
 		Name:      "Cartao de Credito",
 		Type:      Debit,
 		Info:      "",
 		CreatedAt: time.Now()})
-	receitas.AddAccount(Account{
+	despesas.AddAccount(Account{
 		Reference: NewReference(),
 		Name:      "Salarios",
 		Type:      Debit,
 		Info:      "",
 		CreatedAt: time.Now()})
-	receitas.AddAccount(Account{
+	despesas.AddAccount(Account{
 		Reference: NewReference(),
 		Name:      "Frete",
 		Type:      Debit,
@@ -239,19 +243,42 @@ func NewAccountsBrazil() *Accounts {
 		Type:      AccountsTypeBrazil}
 }
 
-func (accs *Accounts) GetAccountRefByName(name string) string {
-	// TODO
-	return ""
+func (acc *Account) getAccountRefByNameRec(name string) (string, error) {
+	if acc.Name == name {
+		return acc.Reference, nil
+	}
+	for _, val := range acc.Childrens {
+		ref, err := val.getAccountRefByNameRec(name)
+		if err == nil {
+			return ref, nil
+		}
+	}
+	return "", notFound
+}
+
+func (accs *Accounts) GetAccountRefByName(name string) (string, error) {
+	val, err := accs.Asset.getAccountRefByNameRec(name)
+	if err == nil {
+		return val, err
+	}
+	val, err = accs.Liability.getAccountRefByNameRec(name)
+	if err == nil {
+		return val, err
+	}
+	val, err = accs.Income.getAccountRefByNameRec(name)
+	if err == nil {
+		return val, err
+	}
+	val, err = accs.Expense.getAccountRefByNameRec(name)
+	if err == nil {
+		return val, err
+	}
+
+	return "", notFound
 }
 
 func (acc *Account) HasChildrens() bool {
-	// TODO
-	return false
-}
-
-func (accs *Accounts) HasAccountByRef() bool {
-	//TODO
-	return false
+	return len(acc.Childrens) != 0
 }
 
 func (accs *Accounts) GetAccountByRef() (Account, error) {
@@ -291,7 +318,6 @@ func (ent Entry) Valid() bool {
 }
 
 // Persistence
-
 func GetAccountsByUser(name string) (Accounts, error) {
 	db, err := bolt.Open(dbFilename, 0600, nil)
 	if err != nil {
@@ -332,7 +358,7 @@ func (accs *Accounts) Save() error {
 
 func (accs *Accounts) Remove() error {
 	//TODO
-	return nil
+	return errors.New("Remove Accounts not implemented")
 }
 
 func (ent *Entry) Save() error {
