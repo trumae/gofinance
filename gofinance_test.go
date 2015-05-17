@@ -1,7 +1,7 @@
 package gofinance
 
 import (
-	///"log"
+	"github.com/shopspring/decimal"
 	"testing"
 )
 
@@ -132,5 +132,72 @@ func TestAccountByRef(t *testing.T) {
 	}
 	if accCaixa.Reference != refCaixa {
 		t.Error("Error in Account returned")
+	}
+
+	_, err = accs.GetAccountByRef("ref")
+	if err == nil {
+		t.Error("Found not exist ref")
+	}
+}
+
+func TestNewEntryAndValid(t *testing.T) {
+	accs := NewAccountsBrazil()
+	accs.User = "test2@gmail.com"
+	accs.Save()
+
+	refAtivo := accs.Asset.Childrens[0].Reference
+
+	ent := NewEntry(accs, "Test of entry")
+	if !ent.Valid() {
+		t.Error("Error in Valid test")
+	}
+
+	ent.AddDebit(refAtivo, decimal.NewFromFloat(10.0), "first debit")
+	if ent.Valid() {
+		t.Error("Error in Valid test")
+	}
+
+	ent.AddDebit(refAtivo, decimal.NewFromFloat(5.0), "second debit")
+	if ent.Valid() {
+		t.Error("Error in Valid test")
+	}
+
+	ent.AddCredit(refAtivo, decimal.NewFromFloat(7.0), "first credit")
+	if ent.Valid() {
+		t.Error("Error in Valid test")
+	}
+
+	ent.AddCredit(refAtivo, decimal.NewFromFloat(8.0), "second credit")
+	if !ent.Valid() {
+		t.Error("Error in Valid test")
+	}
+}
+
+func TestEntrySave(t *testing.T) {
+	accs := NewAccountsBrazil()
+	accs.User = "test3@gmail.com"
+	accs.Save()
+
+	refCaixa, _ := accs.GetAccountRefByName("Caixa")
+
+	ent := NewEntry(accs, "Save Test")
+	ent.AddDebit(refCaixa, decimal.NewFromFloat(10.0), "first debit")
+	ent.AddDebit(refCaixa, decimal.NewFromFloat(5.0), "second debit")
+	ent.AddCredit(refCaixa, decimal.NewFromFloat(7.0), "first credit")
+	ent.AddCredit(refCaixa, decimal.NewFromFloat(8.0), "second credit")
+
+	err := ent.Save()
+	if err != nil {
+		t.Error(err)
+	}
+
+	ent2 := &Entry{}
+	ent2, err = GetEntryByRef(ent.Reference)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if string(ent.Reference) != string(ent2.Reference) {
+		t.Error("Entries saved not are equals")
 	}
 }

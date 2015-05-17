@@ -21,10 +21,11 @@ const (
 var (
 	// errors
 	notFound = errors.New("NotFound")
+	notValid = errors.New("NotValid")
 
 	dbFilename = "accounts.db"
 	bAccounts  = "accounts"
-	bEntry     = "entries"
+	bEntries   = "entries"
 )
 
 func init() {
@@ -39,9 +40,9 @@ func init() {
 		if err != nil {
 			log.Fatalln("create bucket:", bAccounts, err)
 		}
-		_, err = tx.CreateBucketIfNotExists([]byte(bEntry))
+		_, err = tx.CreateBucketIfNotExists([]byte(bEntries))
 		if err != nil {
-			log.Fatalln("create bucket:", bEntry, err)
+			log.Fatalln("create bucket:", bEntries, err)
 		}
 		return nil
 	})
@@ -67,12 +68,14 @@ type Accounts struct {
 }
 
 type UnitEntry struct {
-	Reference string
-	Value     decimal.Decimal
-	Info      string
+	Value      decimal.Decimal
+	RefAccount string
+	Info       string
 }
 
 type Entry struct {
+	User      string
+	Reference string
 	Debits    []UnitEntry
 	Credits   []UnitEntry
 	CreatedAt time.Time
@@ -290,10 +293,6 @@ func (accs *Accounts) GetAccountRefByName(name string) (string, error) {
 	return "", notFound
 }
 
-func (acc *Account) HasChildrens() bool {
-	return len(acc.Childrens) != 0
-}
-
 func (accs *Accounts) GetAccountByRef(ref string) (*Account, error) {
 	val, err := accs.Asset.getAccountByRefRec(ref)
 	if err == nil {
@@ -315,38 +314,76 @@ func (accs *Accounts) GetAccountByRef(ref string) (*Account, error) {
 		return val, err
 	}
 
-	return &Account{}, nil
+	return &Account{}, notFound
 }
 
-func NewEntry(info string) Entry {
-	//TODO
-	return Entry{Info: info,
+func (acc *Account) HasChildrens() bool {
+	return len(acc.Childrens) != 0
+}
+
+func NewEntry(accs *Accounts, info string) *Entry {
+	return &Entry{
+		User:      accs.User,
+		Reference: NewReference(),
+		Info:      info,
 		CreatedAt: time.Now()}
 }
 
-func (ent *Entry) AddDebit(ref string,
+func (ent *Entry) AddDebit(
+	refacc string,
 	value decimal.Decimal,
 	info string) {
-	//TODO
-	ue := UnitEntry{Reference: ref,
-		Value: value,
-		Info:  info}
+	ue := UnitEntry{
+		RefAccount: refacc,
+		Value:      value,
+		Info:       info}
 	ent.Debits = append(ent.Debits, ue)
 }
 
-func (ent *Entry) AddCredit(ref string,
+func (ent *Entry) AddCredit(
+	refacc string,
 	value decimal.Decimal,
 	info string) {
-	//TODO
-	ue := UnitEntry{Reference: ref,
-		Value: value,
-		Info:  info}
+	ue := UnitEntry{
+		RefAccount: refacc,
+		Value:      value,
+		Info:       info}
 	ent.Credits = append(ent.Credits, ue)
 }
 
-func (ent Entry) Valid() bool {
-	//TODO
-	return false
+func (ent *Entry) Valid() bool {
+	accs, err := GetAccountsByUser(ent.User)
+	if err != nil {
+		return false
+	}
+
+	if len(ent.Reference) == 0 {
+		return false
+	}
+
+	sumDebit := decimal.NewFromFloat(0.0)
+	for _, uent := range ent.Debits {
+		sumDebit = sumDebit.Add(uent.Value)
+		_, err := accs.GetAccountByRef(uent.RefAccount)
+		if err != nil {
+			return false
+		}
+	}
+
+	sumCredit := decimal.NewFromFloat(0.0)
+	for _, uent := range ent.Credits {
+		sumCredit = sumCredit.Add(uent.Value)
+		_, err := accs.GetAccountByRef(uent.RefAccount)
+		if err != nil {
+			return false
+		}
+	}
+
+	if !sumCredit.Equals(sumDebit) {
+		return false
+	}
+
+	return true
 }
 
 // Persistence
@@ -393,12 +430,48 @@ func (accs *Accounts) Remove() error {
 	return errors.New("Remove Accounts not implemented")
 }
 
+func GetEntryByRef(ref string) (*Entry, error) {
+	db, err := bolt.Open(dbFilename, 0600, nil)
+	if err != nil {
+		return &Entry{}, err
+	}
+	defer db.Close()
+	entry := Entry{}
+
+	err = db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(bEntries))
+		ent := b.Get([]byte(ref))
+		err := json.Unmarshal(ent, &entry)
+		return err
+	})
+
+	return &entry, err
+}
 func (ent *Entry) Save() error {
-	// TODO
-	return nil
+	if !ent.Valid() {
+		return notValid
+	}
+
+	db, err := bolt.Open(dbFilename, 0600, nil)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	err = db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(bEntries))
+		json, err := ent.Json()
+		if err != nil {
+			log.Println(err)
+		}
+		err = b.Put([]byte(ent.Reference), json)
+		return err
+	})
+
+	return err
 }
 
-func (ent *Entry) Remove() error {
+func (ent *Entry) Remove(ref string) error {
 	//TODO
 	return nil
 }
@@ -415,6 +488,15 @@ func (accs *Accounts) Json() ([]byte, error) {
 
 func (acc *Account) Json() ([]byte, error) {
 	b, err := json.Marshal(acc)
+	if err != nil {
+		log.Println("error:", err)
+		return nil, err
+	}
+	return b, nil
+}
+
+func (ent *Entry) Json() ([]byte, error) {
+	b, err := json.Marshal(ent)
 	if err != nil {
 		log.Println("error:", err)
 		return nil, err
