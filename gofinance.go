@@ -472,8 +472,19 @@ func (ent *Entry) Save() error {
 }
 
 func (ent *Entry) Remove(ref string) error {
-	//TODO
-	return nil
+	db, err := bolt.Open(dbFilename, 0600, nil)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	err = db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(bEntries))
+		err = b.Delete([]byte(ent.Reference))
+		return err
+	})
+
+	return err
 }
 
 // Marshal

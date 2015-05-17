@@ -201,3 +201,45 @@ func TestEntrySave(t *testing.T) {
 		t.Error("Entries saved not are equals")
 	}
 }
+
+func TestDeleteEntry(t *testing.T) {
+	accs := NewAccountsBrazil()
+	accs.User = "test4@gmail.com"
+	accs.Save()
+
+	ent := NewEntry(accs, "entry1")
+	ent.Save()
+
+	ent2, err := GetEntryByRef(ent.Reference)
+	if err != nil {
+		t.Error("Error saving", err)
+	}
+
+	if ent.Reference != ent2.Reference {
+		t.Error(err)
+	}
+}
+
+////////// Benchmarks ////////////////////////
+
+func BenchmarkAccountsSave(t *testing.B) {
+	accs := NewAccountsBrazil()
+	accs.User = "test@gmail.com"
+	accs.Save()
+}
+
+func BenchmarkEntrySave(t *testing.B) {
+	accs := NewAccountsBrazil()
+	accs.User = "test@gmail.com"
+	accs.Save()
+
+	refCaixa, _ := accs.GetAccountRefByName("Caixa")
+
+	ent := NewEntry(accs, "Save Test")
+	ent.AddDebit(refCaixa, decimal.NewFromFloat(10.0), "first debit")
+	ent.AddDebit(refCaixa, decimal.NewFromFloat(5.0), "second debit")
+	ent.AddCredit(refCaixa, decimal.NewFromFloat(7.0), "first credit")
+	ent.AddCredit(refCaixa, decimal.NewFromFloat(8.0), "second credit")
+
+	ent.Save()
+}
