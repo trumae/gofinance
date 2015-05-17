@@ -1,7 +1,7 @@
 package gofinance
 
 import (
-	"log"
+	///"log"
 	"testing"
 )
 
@@ -69,10 +69,8 @@ func TestHasChildrens(t *testing.T) {
 func TestGetAccountRefByName(t *testing.T) {
 	//func (accs *Accounts) GetAccountRefByName(name string) (string, error)
 	accs := NewAccountsBrazil()
-	log.Println(accs)
 
 	refAtivo, err := accs.GetAccountRefByName("Ativo")
-	log.Println("Ativo", refAtivo)
 	if err == nil {
 		if refAtivo != accs.Asset.Reference {
 			t.Error("Account with name Ativo Found Fail.")
@@ -82,7 +80,6 @@ func TestGetAccountRefByName(t *testing.T) {
 	}
 
 	refCaixa, err := accs.GetAccountRefByName("Caixa")
-	log.Println("Caixa", refCaixa)
 	if err == nil {
 		if refCaixa != accs.Asset.Childrens[0].Reference {
 			t.Error("Account with name Caixa Found Fail.")
@@ -92,7 +89,6 @@ func TestGetAccountRefByName(t *testing.T) {
 	}
 
 	refPrestacoes, err := accs.GetAccountRefByName("Prestacoes")
-	log.Println("Prestacoes", refPrestacoes)
 	if err == nil {
 		if refPrestacoes != accs.Liability.Childrens[2].Reference {
 			t.Error("Account with name Prestacoes Found Fail.")
@@ -102,7 +98,6 @@ func TestGetAccountRefByName(t *testing.T) {
 	}
 
 	refSalario, err := accs.GetAccountRefByName("Salario")
-	log.Println("Salario", refSalario)
 	if err == nil {
 		if refSalario != accs.Income.Childrens[0].Reference {
 			t.Error("Account with name Salario Found Fail.")
@@ -115,5 +110,27 @@ func TestGetAccountRefByName(t *testing.T) {
 	if err == nil {
 		t.Error("Account with name XPTO found, but not exist.")
 	}
+}
 
+func TestAccountByRef(t *testing.T) {
+	accs := NewAccountsBrazil()
+
+	refAtivo := accs.Asset.Reference
+	refCaixa := accs.Asset.Childrens[0].Reference
+
+	accAtivo, err := accs.GetAccountByRef(refAtivo)
+	if err != nil {
+		t.Error(err)
+	}
+	if accAtivo.Reference != refAtivo {
+		t.Error("Error in Account returned")
+	}
+
+	accCaixa, err := accs.GetAccountByRef(refCaixa)
+	if err != nil {
+		t.Error(err)
+	}
+	if accCaixa.Reference != refCaixa {
+		t.Error("Error in Account returned")
+	}
 }

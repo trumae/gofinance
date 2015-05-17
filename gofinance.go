@@ -256,6 +256,19 @@ func (acc *Account) getAccountRefByNameRec(name string) (string, error) {
 	return "", notFound
 }
 
+func (acc *Account) getAccountByRefRec(ref string) (*Account, error) {
+	if acc.Reference == ref {
+		return acc, nil
+	}
+	for _, val := range acc.Childrens {
+		nacc, err := val.getAccountByRefRec(ref)
+		if err == nil {
+			return nacc, nil
+		}
+	}
+	return nil, notFound
+}
+
 func (accs *Accounts) GetAccountRefByName(name string) (string, error) {
 	val, err := accs.Asset.getAccountRefByNameRec(name)
 	if err == nil {
@@ -281,9 +294,28 @@ func (acc *Account) HasChildrens() bool {
 	return len(acc.Childrens) != 0
 }
 
-func (accs *Accounts) GetAccountByRef() (Account, error) {
-	//TODO
-	return Account{}, nil
+func (accs *Accounts) GetAccountByRef(ref string) (*Account, error) {
+	val, err := accs.Asset.getAccountByRefRec(ref)
+	if err == nil {
+		return val, err
+	}
+
+	val, err = accs.Liability.getAccountByRefRec(ref)
+	if err == nil {
+		return val, err
+	}
+
+	val, err = accs.Income.getAccountByRefRec(ref)
+	if err == nil {
+		return val, err
+	}
+
+	val, err = accs.Expense.getAccountByRefRec(ref)
+	if err == nil {
+		return val, err
+	}
+
+	return &Account{}, nil
 }
 
 func NewEntry(info string) Entry {
