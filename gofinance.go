@@ -459,6 +459,20 @@ func (ent *Entry) Save() error {
 	defer db.Close()
 
 	err = db.Update(func(tx *bolt.Tx) error {
+		accs := Accounts{}
+
+		// get Accounts
+		bacc := tx.Bucket([]byte(bAccounts))
+		raccs := bacc.Get([]byte(ent.User))
+		err := json.Unmarshal(raccs, &accs)
+		if err != nil {
+			return err
+		}
+
+		// updateAccounts
+		//TODO
+
+		// put Entry
 		b := tx.Bucket([]byte(bEntries))
 		json, err := ent.Json()
 		if err != nil {

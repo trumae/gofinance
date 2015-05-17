@@ -234,12 +234,11 @@ func BenchmarkEntrySave(t *testing.B) {
 	accs.Save()
 
 	refCaixa, _ := accs.GetAccountRefByName("Caixa")
+	refSalario, _ := accs.GetAccountRefByName("Salario")
 
 	ent := NewEntry(accs, "Save Test")
-	ent.AddDebit(refCaixa, decimal.NewFromFloat(10.0), "first debit")
-	ent.AddDebit(refCaixa, decimal.NewFromFloat(5.0), "second debit")
-	ent.AddCredit(refCaixa, decimal.NewFromFloat(7.0), "first credit")
-	ent.AddCredit(refCaixa, decimal.NewFromFloat(8.0), "second credit")
+	ent.AddDebit(refCaixa, decimal.NewFromFloat(10.0), "Salario")
+	ent.AddCredit(refSalario, decimal.NewFromFloat(10.0), "Salario")
 
 	ent.Save()
 }
